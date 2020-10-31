@@ -6,4 +6,4 @@ arp-spoof: main.o arphdr.o ethhdr.o ip.o mac.o
 	$(LINK.cc) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 clean:
-	rm -f send-arp *.o
+	rm -f arp-spoof *.o

@@ -179,11 +179,11 @@ void checking_packet(pcap_t* handle,char *my_mac_addr,char *my_ip,int count){
 		else{
 			EthIpPacket *packet2 = (EthIpPacket *) packet;
 			for(int i=0;i<count;i++){				
-				if((packet2->eth_.smac_ == Mac(store_mac[find_index_ip(sender_ips[i])])) &&(packet2->eth_.dmac_ == Mac(my_mac_addr)) && (packet2->d_ip == (Ip)htonl(Ip(target_ips[i]))) ){
+				if((packet2->eth_.smac_ == Mac(store_mac[find_index_ip(sender_ips[i])])) &&(packet2->eth_.dmac_ == Mac(my_mac_addr)) &&  (packet2->d_ip == (Ip)htonl(Ip(target_ips[i]))) && (packet2->s_ip == (Ip)htonl(Ip(sender_ips[i]))) ){
 					u_char * relay_packet = (u_char  *)malloc(header->caplen);
 					memcpy(relay_packet,packet,header->caplen);
-					((EthHdr *)relay_packet)-> smac_ = Mac(my_mac_addr);
 					((EthHdr *)relay_packet)-> dmac_ = Mac(store_mac[find_index_ip(target_ips[i])]);
+					((EthHdr *)relay_packet)-> smac_ = Mac(my_mac_addr);
 					int res = pcap_sendpacket(handle, relay_packet,header->caplen);
 					printf("send sender's packet\n"); 
 					if (res != 0) {
@@ -230,7 +230,7 @@ int main(int argc, char* argv[]) {
 		*(target_ips + (i-1)) = argv[2*i + 1];
 	}
 	for(int i=0;i<argc-2;i++){
-		index = find_index_ip(argv[i+2]);
+		 index = find_index_ip(argv[i+2]);
 		if(index >=0)
 			continue;
 		if(index == -2){
