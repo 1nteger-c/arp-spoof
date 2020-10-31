@@ -143,9 +143,9 @@ void send_packet(pcap_t* handle,char * sender_ip,char * target_ip,char *my_mac_a
 	packet.arp_.sip_ = htonl(Ip(target_ip));
 	packet.arp_.tmac_ = Mac(sender_mac_addr);
 	packet.arp_.tip_ = htonl(Ip(sender_ip));
+	printf("update sender's arp table\n");
 	for(int i=0;i<3;i++){
 	int res = pcap_sendpacket(handle, reinterpret_cast<const u_char*>(&packet), sizeof(EthArpPacket));
-	printf("sending...\n");
 	if (res != 0) {
 		fprintf(stderr, "pcap_sendpacket return %d error=%s\n", res, pcap_geterr(handle));
 	}}
@@ -170,7 +170,6 @@ void checking_packet(pcap_t* handle,char *my_mac_addr,char *my_ip,int count){
 			for(int i=0;i<count;i++){
 				if(packet1->arp_.sip_ == (Ip)htonl(Ip(target_ips[i]))
 				|| packet1->arp_.sip_ == (Ip)htonl(Ip(sender_ips[i]))) {
-					printf("WOW\n");
 					send_packet(handle,sender_ips[i],target_ips[i],my_mac_addr,my_ip);
 				}
 
@@ -178,16 +177,13 @@ void checking_packet(pcap_t* handle,char *my_mac_addr,char *my_ip,int count){
 
 		}
 		else{
-			printf("GET\n");
 			EthIpPacket *packet2 = (EthIpPacket *) packet;
 			for(int i=0;i<count;i++){				
-				if((packet2->eth_.smac_ == Mac(store_mac[find_index_ip(sender_ips[i])])) &&(packet2->eth_.dmac_ == Mac(my_mac_addr)) &&(packet2->s_ip == (Ip)htonl(Ip(sender_ips[i]))) && (packet2->d_ip == (Ip)htonl(Ip(target_ips[i]))) ){
+				if((packet2->eth_.smac_ == Mac(store_mac[find_index_ip(sender_ips[i])])) &&(packet2->eth_.dmac_ == Mac(my_mac_addr)) && (packet2->d_ip == (Ip)htonl(Ip(target_ips[i]))) ){
 					u_char * relay_packet = (u_char  *)malloc(header->caplen);
 					memcpy(relay_packet,packet,header->caplen);
 					((EthHdr *)relay_packet)-> smac_ = Mac(my_mac_addr);
 					((EthHdr *)relay_packet)-> dmac_ = Mac(store_mac[find_index_ip(target_ips[i])]);
-					//printf("%x:%x:%x:%x:%x:%x\n",packet2->eth_.dmac_[0],packet2->eth_.dmac_[1],packet2->eth_.dmac_[2],packet2->eth_.dmac_[3],packet2->eth_.dmac_[4],packet2->eth_.dmac_[5]);
-					//printf("%d\n",header->caplen);
 					int res = pcap_sendpacket(handle, relay_packet,header->caplen);
 					printf("send sender's packet\n"); 
 					if (res != 0) {
